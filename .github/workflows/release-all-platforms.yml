@@ -116,8 +116,8 @@ jobs:
 
     - name: Build macOS packages
       run: |
-        chmod +x "build automation/build-mac-enhanced.sh"
-        "./build automation/build-mac-enhanced.sh" --dmg
+        chmod +x "build automation/build-mac.sh"
+        "./build automation/build-mac.sh" --dmg
 
     - name: Upload macOS artifacts
       uses: actions/upload-artifact@v4
@@ -170,8 +170,8 @@ jobs:
 
     - name: Build Linux packages
       run: |
-        chmod +x "build automation/build-linux-enhanced.sh"
-        "./build automation/build-linux-enhanced.sh" --appimage --deb --rpm
+        chmod +x "build automation/build-linux.sh"
+        "./build automation/build-linux.sh" --appimage --deb --rpm
 
     - name: Upload Linux artifacts
       uses: actions/upload-artifact@v4
