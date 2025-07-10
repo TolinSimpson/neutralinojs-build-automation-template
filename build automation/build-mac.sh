@@ -2,7 +2,7 @@
 #
 # build-mac.sh
 #
-# macOS build script for NeutralinoJS with code signing and DMG packaging
+# Enhanced macOS build script for NeutralinoJS with code signing and DMG packaging
 #
 # Requirements:
 # - brew install jq create-dmg
@@ -10,10 +10,10 @@
 # - App-specific password for notarization
 #
 # Usage:
-# ./build-mac.sh [--sign] [--notarize] [--dmg]
+# ./build-mac-enhanced.sh [--sign] [--notarize] [--dmg]
 #
 # (c)2023-2024 Harald Schneider - marketmix.com
-# Template macOS build script for {{APP_DISPLAY_NAME}}
+# (c)2025 Tolin Simpson - enhanced build automation.
 
 VERSION='1.1.0'
 OS=$(uname -s)
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo
-echo -e "\033[1mNeutralinoJS BuildScript for macOS platform, version ${VERSION}\033[0m"
+echo -e "\033[1mEnhanced Neutralino BuildScript for macOS platform, version ${VERSION}\033[0m"
 
 # Code signing configuration (set these environment variables)
 DEVELOPER_ID_APP="${DEVELOPER_ID_APP:-Developer ID Application: Your Name (XXXXXXXXXX)}"
