@@ -1,0 +1,82 @@
+name: Build macOS App Bundle
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "{{APP_DISPLAY_NAME}}"
+  APP_VERSION: "{{APP_VERSION}}"
+  PUBLISHER: "{{APP_PUBLISHER}}"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g @neutralinojs/neu
+        brew install jq create-dmg
+
+    - name: Build Neutralino app
+      run: |
+        neu build
+
+    - name: Build macOS app bundles (unsigned but professional)
+      run: |
+        chmod +x "build automation/build-mac-enhanced.sh"
+        "./build automation/build-mac-enhanced.sh" --dmg
+
+    - name: Upload macOS builds
+      uses: actions/upload-artifact@v4
+      with:
+        name: homestead-tools-macos-${{ github.run_number }}
+        path: |
+          dist/mac_*/*.app
+          dist/mac_*/*.dmg
+        retention-days: 90
+
+    - name: Create Release (on tags)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/mac_*/*.dmg
+        name: ${{ env.APP_NAME }} ${{ env.APP_VERSION }}
+        body: |
+          ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }}
+          
+          ### macOS Downloads (Unsigned)
+          - **Universal (Intel + Apple Silicon)**: Homestead Tools-${{ env.APP_VERSION }}-universal.dmg
+          - **Intel Macs**: Homestead Tools-${{ env.APP_VERSION }}-x64.dmg  
+          - **Apple Silicon**: Homestead Tools-${{ env.APP_VERSION }}-arm64.dmg
+          
+          ### Installation Instructions
+          1. Download the appropriate DMG for your Mac
+          2. Double-click the DMG file to mount it
+          3. Drag "Homestead Tools" to the Applications folder
+          4. **First Launch**: Right-click the app → "Open" → "Open" to bypass security warning
+          5. Subsequent launches work normally from Applications or Spotlight
+          
+          **Note**: These builds are unsigned but fully functional. The security warning on first launch is normal for unsigned applications.
+          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
