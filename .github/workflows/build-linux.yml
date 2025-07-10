@@ -1,0 +1,124 @@
+name: Build Linux Packages
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "{{APP_DISPLAY_NAME}}"
+  APP_VERSION: "{{APP_VERSION}}"
+  PUBLISHER: "{{APP_PUBLISHER}}"
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g @neutralinojs/neu
+        
+        # Install Linux packaging tools
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          fuse \
+          libfuse2 \
+          rpm \
+          alien \
+          desktop-file-utils \
+          wget \
+          curl \
+          jq
+
+    - name: Install AppImage tools
+      run: |
+        # Download AppImageTool
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+        
+        # Download linuxdeploy
+        wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+        chmod +x linuxdeploy-x86_64.AppImage
+        sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
+
+    - name: Build Neutralino app
+      run: |
+        neu build
+
+    - name: Build Linux packages
+      run: |
+        chmod +x "build automation/build-linux-enhanced.sh"
+        "./build automation/build-linux-enhanced.sh" --appimage --deb --rpm
+      
+    - name: Upload Linux builds
+      uses: actions/upload-artifact@v4
+      with:
+        name: homestead-tools-linux-${{ github.run_number }}
+        path: |
+          dist/linux_*/*.AppImage
+          dist/linux_*/*.deb
+          dist/linux_*/*.rpm
+        retention-days: 90
+
+    - name: Create Release (on tags)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/linux_*/*.AppImage
+          dist/linux_*/*.deb
+          dist/linux_*/*.rpm
+        name: ${{ env.APP_NAME }} ${{ env.APP_VERSION }}
+        body: |
+          ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }}
+          
+          ### Linux Downloads
+          - **AppImage (Universal)**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
+          - **Debian/Ubuntu**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-amd64.deb
+          - **RedHat/Fedora**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          
+          ### Installation Instructions
+          
+          #### AppImage (Recommended - works on all distributions)
+          ```bash
+          # Download the AppImage
+          chmod +x {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
+          ./{{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
+          ```
+          
+          #### Debian/Ubuntu
+          ```bash
+          sudo dpkg -i {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-amd64.deb
+          sudo apt-get install -f  # Fix any dependency issues
+          ```
+          
+          #### RedHat/Fedora/CentOS
+          ```bash
+          sudo rpm -i {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          # or
+          sudo dnf install {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          ```
+          
+          **Note**: All packages are unsigned but fully functional.
+          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
