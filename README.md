@@ -2,11 +2,6 @@
 
 This is a template for creating cross-platform desktop applications using [Neutralino.js](https://neutralino.js.org/) with comprehensive build automation and packaging tools.
 
-## Getting Started 
-1. Clone this repo
-2. Download the latest workflows.zip folder from releases
-3. Extract workflows.zip into your project's .github folder
-
 ## Template Placeholders
 
 Before using this template, replace the following placeholders throughout the project files:
