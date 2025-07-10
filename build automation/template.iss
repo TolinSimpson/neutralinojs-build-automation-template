@@ -7,6 +7,7 @@ AppVersion={{APP_VERSION}}
 DefaultDirName={commonpf}\{{APP_BINARY_NAME}}
 DefaultGroupName={{APP_DISPLAY_NAME}}
 OutputBaseFilename={{APP_BINARY_NAME}}-Windows64_Installer
+OutputDir=..
 Compression=lzma
 SolidCompression=yes
 DisableDirPage=no
