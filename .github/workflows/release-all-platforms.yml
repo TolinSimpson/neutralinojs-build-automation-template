@@ -1,0 +1,290 @@
+name: Release All Platforms
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., {{APP_VERSION}})'
+        required: true
+        default: '{{APP_VERSION}}'
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "{{APP_DISPLAY_NAME}}"
+  PUBLISHER: "{{APP_PUBLISHER}}"
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Get version from tag or input
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          TAG="${{ github.event.inputs.version }}"
+          VERSION="${TAG#v}"
+        else
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        echo "Building version: ${VERSION}"
+
+  build-windows:
+    runs-on: windows-latest
+    needs: get-version
+    env:
+      APP_VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Neutralino CLI
+      run: npm install -g @neutralinojs/neu
+
+    - name: Build Neutralino app
+      run: neu build
+
+    - name: Build Windows executable
+      run: |
+        # Run Windows build script if it exists
+        if (Test-Path "./build-win.ps1") {
+          ./build-win.ps1
+        } elseif (Test-Path "./build-win.sh") {
+          bash ./build-win.sh
+        }
+
+    - name: Setup Inno Setup with retry
+      run: |
+        choco install innosetup -y
+        Start-Sleep -Seconds 10
+        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+          Write-Host "Inno Setup not found, retrying installation..."
+          choco install innosetup -y --force
+          Start-Sleep -Seconds 5
+        }
+
+    - name: Build Windows installer
+      run: |
+        # Compile Inno Setup script
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" {{APP_BINARY_NAME}}.iss
+
+    - name: Upload Windows artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-installer
+        path: Output/*.exe
+        retention-days: 7
+
+  build-macos:
+    runs-on: macos-latest
+    needs: get-version
+    env:
+      APP_VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g @neutralinojs/neu
+        brew install jq create-dmg
+
+    - name: Build Neutralino app
+      run: neu build
+
+    - name: Build macOS packages
+      run: |
+        chmod +x "build automation/build-mac-enhanced.sh"
+        "./build automation/build-mac-enhanced.sh" --dmg
+
+    - name: Upload macOS artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-packages
+        path: |
+          dist/mac_*/*.dmg
+        retention-days: 7
+
+  build-linux:
+    runs-on: ubuntu-latest
+    needs: get-version
+    env:
+      APP_VERSION: ${{ needs.get-version.outputs.version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: |
+        npm install -g @neutralinojs/neu
+        
+        # Install Linux packaging tools
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          fuse \
+          libfuse2 \
+          rpm \
+          alien \
+          desktop-file-utils \
+          wget \
+          curl \
+          jq
+
+    - name: Install AppImage tools
+      run: |
+        # Download AppImageTool
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+
+    - name: Build Neutralino app
+      run: neu build
+
+    - name: Build Linux packages
+      run: |
+        chmod +x "build automation/build-linux-enhanced.sh"
+        "./build automation/build-linux-enhanced.sh" --appimage --deb --rpm
+
+    - name: Upload Linux artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-packages
+        path: |
+          dist/linux_*/*.AppImage
+          dist/linux_*/*.deb
+          dist/linux_*/*.rpm
+        retention-days: 7
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [get-version, build-windows, build-macos, build-linux]
+    env:
+      APP_VERSION: ${{ needs.get-version.outputs.version }}
+      TAG: ${{ needs.get-version.outputs.tag }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Display artifact structure
+      run: find artifacts -type f -name "*"
+
+    - name: Organize release files
+      run: |
+        mkdir -p release-files
+        
+        # Copy Windows installer
+        find artifacts/windows-installer -name "*.exe" -exec cp {} release-files/ \;
+        
+        # Copy macOS DMG files
+        find artifacts/macos-packages -name "*.dmg" -exec cp {} release-files/ \;
+        
+        # Copy Linux packages
+        find artifacts/linux-packages -name "*.AppImage" -exec cp {} release-files/ \;
+        find artifacts/linux-packages -name "*.deb" -exec cp {} release-files/ \;
+        find artifacts/linux-packages -name "*.rpm" -exec cp {} release-files/ \;
+        
+        echo "Release files prepared:"
+        ls -la release-files/
+
+    - name: Create comprehensive release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.TAG }}
+        name: ${{ env.APP_NAME }} ${{ env.APP_VERSION }}
+        files: release-files/*
+        body: |
+          ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }}
+          
+          Complete cross-platform release with professional installers for all platforms.
+          
+          ### 🪟 Windows
+          - **Installer**: `{{APP_BINARY_NAME}}-Windows64_Installer.exe`
+          - **Installation**: Download and run the installer
+          - **Requirements**: Windows 10/11 (64-bit)
+          
+          ### 🍎 macOS
+          - **Universal (Recommended)**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-universal.dmg`
+          - **Intel Macs**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x64.dmg`  
+          - **Apple Silicon**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-arm64.dmg`
+          - **Installation**: Download DMG → Double-click → Drag to Applications
+          - **First Launch**: Right-click app → "Open" → "Open" (one-time for unsigned)
+          
+          ### 🐧 Linux
+          - **AppImage (Universal)**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage`
+          - **Debian/Ubuntu**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-amd64.deb`
+          - **RedHat/Fedora**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm`
+          
+          #### Linux Installation
+          ```bash
+          # AppImage (works on all distributions)
+          chmod +x Homestead\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
+          ./Homestead\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
+          
+          # Debian/Ubuntu
+          sudo dpkg -i homestead-tools-${{ env.APP_VERSION }}-amd64.deb
+          
+          # RedHat/Fedora
+          sudo rpm -i homestead-tools-${{ env.APP_VERSION }}-x86_64.rpm
+          ```
+          
+          ### 🎯 What's New in v${{ env.APP_VERSION }}
+          - Cross-platform compatibility improvements
+          - Enhanced user interface
+          - Bug fixes and performance optimizations
+          - Professional packaging for all platforms
+          
+          ### 🔧 Technical Details
+          - **Framework**: Neutralino.js
+          - **Platforms**: Windows 10/11, macOS 10.13+, Linux (all distributions)
+          - **Architectures**: x64, ARM64 (macOS/Linux), Universal (macOS)
+          - **Signing Status**: 
+            - Windows: Unsigned (manual override required)
+            - macOS: Unsigned (right-click → Open required)
+            - Linux: No signing needed
+          
+          ### 🆘 Support
+          If you encounter any issues:
+          1. Check that you're using the correct package for your platform
+          2. Ensure your system meets the minimum requirements
+          3. For unsigned packages, follow the security override instructions above
+          4. [Open an issue](../../issues) if problems persist
+          
+          Thank you for using ${{ env.APP_NAME }}! 🌱
+          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
