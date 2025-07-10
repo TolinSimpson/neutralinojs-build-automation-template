@@ -1,9 +1,6 @@
 name: Build Linux Packages
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,9 +9,12 @@ permissions:
   contents: write
 
 env:
-  APP_NAME: "{{APP_DISPLAY_NAME}}"
-  APP_VERSION: "{{APP_VERSION}}"
-  PUBLISHER: "{{APP_PUBLISHER}}"
+  APP_NAME: "My App"
+  APP_BINARY_NAME: "MyApp"
+  APP_VERSION: "1.0.0"
+  PUBLISHER: "Publisher Name"
+  BUILD_AUTOMATION_PATH: "build automation"
+  LINUX_BUILD_SCRIPT: "build-linux.sh"
 
 jobs:
   build-linux:
@@ -32,8 +32,6 @@ jobs:
     - name: Install dependencies
       run: |
         npm install -g @neutralinojs/neu
-        
-        # Install Linux packaging tools
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
@@ -48,12 +46,10 @@ jobs:
 
     - name: Install AppImage tools
       run: |
-        # Download AppImageTool
         wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool-x86_64.AppImage
         sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
         
-        # Download linuxdeploy
         wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
         chmod +x linuxdeploy-x86_64.AppImage
         sudo mv linuxdeploy-x86_64.AppImage /usr/local/bin/linuxdeploy
@@ -64,13 +60,13 @@ jobs:
 
     - name: Build Linux packages
       run: |
-        chmod +x "build automation/build-linux.sh"
-        "./build automation/build-linux.sh" --appimage --deb --rpm
+        chmod +x "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.LINUX_BUILD_SCRIPT }}"
+        "./${{ env.BUILD_AUTOMATION_PATH }}/${{ env.LINUX_BUILD_SCRIPT }}" --appimage --deb --rpm
       
     - name: Upload Linux builds
       uses: actions/upload-artifact@v4
       with:
-        name: homestead-tools-linux-${{ github.run_number }}
+        name: linux-packages
         path: |
           dist/linux_*/*.AppImage
           dist/linux_*/*.deb
@@ -90,30 +86,30 @@ jobs:
           ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }}
           
           ### Linux Downloads
-          - **AppImage (Universal)**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
-          - **Debian/Ubuntu**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-amd64.deb
-          - **RedHat/Fedora**: {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          - **AppImage (Universal)**: ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.AppImage
+          - **Debian/Ubuntu**: ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-amd64.deb
+          - **RedHat/Fedora**: ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.rpm
           
           ### Installation Instructions
           
           #### AppImage (Recommended - works on all distributions)
           ```bash
           # Download the AppImage
-          chmod +x {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
-          ./{{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage
+          chmod +x ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.AppImage
+          ./${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.AppImage
           ```
           
           #### Debian/Ubuntu
           ```bash
-          sudo dpkg -i {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-amd64.deb
+          sudo dpkg -i ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-amd64.deb
           sudo apt-get install -f  # Fix any dependency issues
           ```
           
           #### RedHat/Fedora/CentOS
           ```bash
-          sudo rpm -i {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          sudo rpm -i ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.rpm
           # or
-          sudo dnf install {{APP_BINARY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm
+          sudo dnf install ${{ env.APP_BINARY_NAME }}-${{ env.APP_VERSION }}-x86_64.rpm
           ```
           
           **Note**: All packages are unsigned but fully functional.

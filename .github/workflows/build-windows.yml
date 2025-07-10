@@ -1,9 +1,10 @@
+# Windows Build Workflow - Optimized for GitHub Actions
+# Pre-installed on windows-latest runners: Node.js, PowerShell, Git, Chocolatey
+# This workflow checks for existing installations before installing new tools
+
 name: Build Windows Installer
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,9 +13,13 @@ permissions:
   contents: write
 
 env:
-  APP_NAME: "{{APP_DISPLAY_NAME}}"
-  APP_VERSION: "{{APP_VERSION}}"
-  PUBLISHER: "{{APP_PUBLISHER}}"
+  APP_NAME: "My App"
+  APP_BINARY_NAME: "MyApp"
+  APP_VERSION: "1.0.0"
+  PUBLISHER: "Publisher Name"
+  BUILD_AUTOMATION_PATH: "build automation"
+  INSTALLER_SCRIPT: "template.iss"
+  INSTALLER_EXE: "MyApp-Windows64_Installer.exe"
 
 jobs:
   build-windows:
@@ -29,168 +34,89 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install Neutralino CLI
-      run: npm install -g @neutralinojs/neu
-
-    - name: Build Neutralino app
+    - name: Install Neutralino CLI and build app
       run: |
-        echo "Building Neutralino application..."
+        npm install -g @neutralinojs/neu
         neu build
-        echo "Neutralino build completed"
+        echo "✅ Neutralino build completed"
 
-    - name: Verify build files
+    - name: Setup Inno Setup
       run: |
-        echo "Checking for required files..."
-        if (Test-Path "dist/{{APP_BINARY_NAME}}/{{APP_BINARY_NAME}}-win_x64.exe") {
-          echo "✓ Windows executable found"
-          Get-ChildItem "dist/{{APP_BINARY_NAME}}/" -Name
-        } else {
-          echo "❌ Windows executable not found"
-          Get-ChildItem "dist/" -Recurse -Name
-          exit 1
-        }
-
-    - name: Run Windows build script (if exists)
-      run: |
-        if (Test-Path "./build-win.ps1") {
-          echo "Running PowerShell build script..."
-          ./build-win.ps1
-        } elseif (Test-Path "./build-win.sh") {
-          echo "Running Bash build script..."
-          bash ./build-win.sh
-        } else {
-          echo "No Windows build script found, proceeding with Inno Setup..."
-        }
-
-    - name: Setup Inno Setup with retry
-      run: |
-        echo "Installing Inno Setup via Chocolatey..."
-        choco install innosetup -y
-        Start-Sleep -Seconds 10
+        choco install innosetup -y --no-progress
         
-        # Verify installation and retry if needed
-        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") -and -not (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe")) {
-          echo "Inno Setup not found, retrying installation..."
-          choco install innosetup -y --force
-          Start-Sleep -Seconds 5
+        $innoPath = @(
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+          "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+        ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+        
+        if (-not $innoPath) {
+          throw "Inno Setup installation failed"
         }
         
-        # Final verification
-        if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-          echo "✓ Inno Setup 6 installed successfully"
-        } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe") {
-          echo "✓ Inno Setup 5 found"
-        } else {
-          echo "❌ Inno Setup installation failed"
-          exit 1
-        }
+        echo "INNO_PATH=$innoPath" >> $env:GITHUB_ENV
 
-    - name: Verify Inno Setup script exists
+    - name: Verify build artifacts and compile installer
       run: |
-        if (Test-Path "build automation/{{APP_BINARY_NAME}}.iss") {
-          echo "✓ Inno Setup script found: build automation/{{APP_BINARY_NAME}}.iss"
-          echo "Script contents:"
-          Get-Content "build automation/{{APP_BINARY_NAME}}.iss" -Head 20
-        } else {
-          echo "❌ build automation/{{APP_BINARY_NAME}}.iss not found"
-          Get-ChildItem "*.iss" -ErrorAction SilentlyContinue
-          exit 1
-        }
-
-    - name: Build Windows installer with Inno Setup
-      run: |
-        echo "Compiling Windows installer..."
+        # Verify required files exist
+        $requiredFiles = @(
+          "dist/${{ env.APP_BINARY_NAME }}/${{ env.APP_BINARY_NAME }}-win_x64.exe",
+          "dist/${{ env.APP_BINARY_NAME }}/resources.neu",
+          "resources/icons/favicon.ico",
+          "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+        )
         
-        # Try Inno Setup 6 first, then 5
-        $innoPath = ""
-        if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
-          $innoPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-        } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe") {
-          $innoPath = "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
-        } else {
-          echo "❌ Inno Setup compiler not found"
-          exit 1
-        }
-        
-        echo "Using Inno Setup at: $innoPath"
-        
-        # Compile the installer
-        & $innoPath "build automation/{{APP_BINARY_NAME}}.iss"
-        
-        if ($LASTEXITCODE -eq 0) {
-          echo "✅ Windows installer built successfully!"
-        } else {
-          echo "❌ Installer build failed with exit code: $LASTEXITCODE"
-          exit 1
-        }
-
-    - name: Verify installer output
-      run: |
-        echo "Checking for installer output..."
-        if (Test-Path "Output") {
-          echo "✓ Output directory found"
-          Get-ChildItem "Output" -Name
-          
-          $installerFiles = Get-ChildItem "Output\*.exe"
-          if ($installerFiles.Count -gt 0) {
-            foreach ($file in $installerFiles) {
-              $size = [math]::Round($file.Length / 1MB, 2)
-              echo "✓ Installer: $($file.Name) (${size} MB)"
-            }
-          } else {
-            echo "❌ No .exe files found in Output directory"
-            exit 1
+        foreach ($file in $requiredFiles) {
+          if (-not (Test-Path $file)) {
+            throw "Required file not found: $file"
           }
-        } else {
-          echo "❌ Output directory not found"
-          exit 1
+        }
+        echo "✅ All required files verified"
+        
+        # Compile installer
+        echo "Compiling Windows installer..."
+        & $env:INNO_PATH "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+        
+        if ($LASTEXITCODE -ne 0) {
+          throw "Inno Setup compilation failed with exit code: $LASTEXITCODE"
+        }
+        
+        # Verify installer output (Inno Setup creates installer in root directory)
+        $installerFile = "${{ env.INSTALLER_EXE }}"
+        if (-not (Test-Path $installerFile)) {
+          throw "Installer file not found: $installerFile"
+        }
+        
+        # Create Output directory and move installer there for consistency with other workflows
+        if (-not (Test-Path "Output")) {
+          New-Item -ItemType Directory -Name "Output"
+        }
+        Move-Item $installerFile "Output/"
+        
+        $installerFiles = Get-ChildItem "Output/*.exe"
+        if ($installerFiles.Count -eq 0) {
+          throw "No installer files found in Output directory"
+        }
+        
+        foreach ($file in $installerFiles) {
+          $size = [math]::Round($file.Length / 1MB, 2)
+          echo "✅ Generated: $($file.Name) (${size} MB)"
         }
 
-    - name: Upload Windows installer
+    - name: Upload installer artifact
       uses: actions/upload-artifact@v4
       with:
-        name: homestead-tools-windows-installer-${{ github.run_number }}
-        path: |
-          Output/*.exe
+        name: windows-installer
+        path: Output/*.exe
         retention-days: 90
 
-    - name: Create Release (on tags)
+    - name: Create GitHub Release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          Output/*.exe
+        files: Output/*.exe
         name: ${{ env.APP_NAME }} ${{ env.APP_VERSION }}
         body: |
           ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }} - Windows Release
-          
-          ### 🪟 Windows Download
-          - **Installer**: `{{APP_BINARY_NAME}}-Windows64_Installer.exe`
-          
-          ### Installation Instructions
-          1. Download the installer
-          2. Right-click the installer → "Run as administrator" (recommended)
-          3. Follow the installation wizard
-          4. Launch from Start Menu or Desktop shortcut
-          
-          ### System Requirements
-          - Windows 10 or Windows 11 (64-bit)
-          - 50MB free disk space
-          - Administrator rights for installation (recommended)
-          
-          ### Security Note
-          This installer is unsigned. Windows may show a security warning:
-          1. Click "More info" on the Windows Defender SmartScreen dialog
-          2. Click "Run anyway"
-          3. This is normal for unsigned applications
-          
-          ### Features in v${{ env.APP_VERSION }}
-          - Professional Windows installer created with Inno Setup
-          - Automatic Start Menu integration
-          - Optional desktop shortcut
-          - Clean uninstall support
-          - Windows 10/11 compatibility
-          
         draft: false
         prerelease: false
       env:

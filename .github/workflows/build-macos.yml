@@ -1,9 +1,6 @@
 name: Build macOS App Bundle
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -12,9 +9,12 @@ permissions:
   contents: write
 
 env:
-  APP_NAME: "{{APP_DISPLAY_NAME}}"
-  APP_VERSION: "{{APP_VERSION}}"
-  PUBLISHER: "{{APP_PUBLISHER}}"
+  APP_NAME: "My App"
+  APP_BINARY_NAME: "MyApp"
+  APP_VERSION: "1.0.0"
+  PUBLISHER: "Publisher Name"
+  BUILD_AUTOMATION_PATH: "build automation"
+  MAC_BUILD_SCRIPT: "build-macos.sh"
 
 jobs:
   build-macos:
@@ -40,13 +40,13 @@ jobs:
 
     - name: Build macOS app bundles (unsigned but professional)
       run: |
-        chmod +x "build automation/build-mac.sh"
-        "./build automation/build-mac.sh" --dmg
+        chmod +x "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.MAC_BUILD_SCRIPT }}"
+        "./${{ env.BUILD_AUTOMATION_PATH }}/${{ env.MAC_BUILD_SCRIPT }}" --dmg
 
     - name: Upload macOS builds
       uses: actions/upload-artifact@v4
       with:
-        name: homestead-tools-macos-${{ github.run_number }}
+        name: macos-packages
         path: |
           dist/mac_*/*.app
           dist/mac_*/*.dmg

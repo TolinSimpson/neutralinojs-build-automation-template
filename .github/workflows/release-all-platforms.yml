@@ -1,21 +1,25 @@
 name: Release All Platforms
 
 on:
-  push:
-    tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., {{APP_VERSION}})'
+        description: 'Version to release (e.g., v1.0.1)'
         required: true
-        default: '{{APP_VERSION}}'
+        default: 'v1.0.1'
 
 permissions:
   contents: write
 
 env:
-  APP_NAME: "{{APP_DISPLAY_NAME}}"
-  PUBLISHER: "{{APP_PUBLISHER}}"
+  APP_NAME: "My App"
+  APP_BINARY_NAME: "MyApp"
+  PUBLISHER: "Publisher Name"
+  BUILD_AUTOMATION_PATH: "build automation"
+  INSTALLER_SCRIPT: "template.iss"
+  INSTALLER_EXE: "MyApp-Windows64_Installer.exe"
+  MAC_BUILD_SCRIPT: "build-macos.sh"
+  LINUX_BUILD_SCRIPT: "build-linux.sh"
 
 jobs:
   get-version:
@@ -83,13 +87,22 @@ jobs:
     - name: Build Windows installer
       run: |
         # Compile Inno Setup script
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" {{APP_BINARY_NAME}}.iss
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+        
+        # Verify installer was created
+        $installerFile = "${{ env.INSTALLER_EXE }}"
+        if (-not (Test-Path $installerFile)) {
+          throw "Installer file not found: $installerFile"
+        }
+        
+        $size = [math]::Round((Get-Item $installerFile).Length / 1MB, 2)
+        echo "✅ Windows installer created: $installerFile (${size} MB)"
 
     - name: Upload Windows artifacts
       uses: actions/upload-artifact@v4
       with:
         name: windows-installer
-        path: Output/*.exe
+        path: ${{ env.INSTALLER_EXE }}
         retention-days: 7
 
   build-macos:
@@ -116,8 +129,8 @@ jobs:
 
     - name: Build macOS packages
       run: |
-        chmod +x "build automation/build-mac.sh"
-        "./build automation/build-mac.sh" --dmg
+        chmod +x "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.MAC_BUILD_SCRIPT }}"
+        "./${{ env.BUILD_AUTOMATION_PATH }}/${{ env.MAC_BUILD_SCRIPT }}" --dmg
 
     - name: Upload macOS artifacts
       uses: actions/upload-artifact@v4
@@ -170,8 +183,8 @@ jobs:
 
     - name: Build Linux packages
       run: |
-        chmod +x "build automation/build-linux.sh"
-        "./build automation/build-linux.sh" --appimage --deb --rpm
+        chmod +x "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.LINUX_BUILD_SCRIPT }}"
+        "./${{ env.BUILD_AUTOMATION_PATH }}/${{ env.LINUX_BUILD_SCRIPT }}" --appimage --deb --rpm
 
     - name: Upload Linux artifacts
       uses: actions/upload-artifact@v4
@@ -205,16 +218,34 @@ jobs:
       run: |
         mkdir -p release-files
         
-        # Copy Windows installer
-        find artifacts/windows-installer -name "*.exe" -exec cp {} release-files/ \;
+        # Copy Windows installer (with error handling)
+        if [ -d "artifacts/windows-installer" ]; then
+          find artifacts/windows-installer -name "*.exe" -exec cp {} release-files/ \;
+          echo "✅ Windows installer copied"
+        else
+          echo "❌ Windows installer artifacts not found"
+          exit 1
+        fi
         
-        # Copy macOS DMG files
-        find artifacts/macos-packages -name "*.dmg" -exec cp {} release-files/ \;
+        # Copy macOS DMG files (with error handling)
+        if [ -d "artifacts/macos-packages" ]; then
+          find artifacts/macos-packages -name "*.dmg" -exec cp {} release-files/ \;
+          echo "✅ macOS packages copied"
+        else
+          echo "❌ macOS package artifacts not found"
+          exit 1
+        fi
         
-        # Copy Linux packages
-        find artifacts/linux-packages -name "*.AppImage" -exec cp {} release-files/ \;
-        find artifacts/linux-packages -name "*.deb" -exec cp {} release-files/ \;
-        find artifacts/linux-packages -name "*.rpm" -exec cp {} release-files/ \;
+        # Copy Linux packages (with error handling)
+        if [ -d "artifacts/linux-packages" ]; then
+          find artifacts/linux-packages -name "*.AppImage" -exec cp {} release-files/ \;
+          find artifacts/linux-packages -name "*.deb" -exec cp {} release-files/ \;
+          find artifacts/linux-packages -name "*.rpm" -exec cp {} release-files/ \;
+          echo "✅ Linux packages copied"
+        else
+          echo "❌ Linux package artifacts not found"
+          exit 1
+        fi
         
         echo "Release files prepared:"
         ls -la release-files/
@@ -231,21 +262,21 @@ jobs:
           Complete cross-platform release with professional installers for all platforms.
           
           ### 🪟 Windows
-          - **Installer**: `{{APP_BINARY_NAME}}-Windows64_Installer.exe`
+          - **Installer**: `${{ env.INSTALLER_EXE }}`
           - **Installation**: Download and run the installer
           - **Requirements**: Windows 10/11 (64-bit)
           
           ### 🍎 macOS
-          - **Universal (Recommended)**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-universal.dmg`
-          - **Intel Macs**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x64.dmg`  
-          - **Apple Silicon**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-arm64.dmg`
+          - **Universal (Recommended)**: `Homestead Tools-${{ env.APP_VERSION }}-universal.dmg`
+          - **Intel Macs**: `Homestead Tools-${{ env.APP_VERSION }}-x64.dmg`  
+          - **Apple Silicon**: `Homestead Tools-${{ env.APP_VERSION }}-arm64.dmg`
           - **Installation**: Download DMG → Double-click → Drag to Applications
           - **First Launch**: Right-click app → "Open" → "Open" (one-time for unsigned)
           
           ### 🐧 Linux
-          - **AppImage (Universal)**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x86_64.AppImage`
-          - **Debian/Ubuntu**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-amd64.deb`
-          - **RedHat/Fedora**: `{{APP_DISPLAY_NAME}}-${{ env.APP_VERSION }}-x86_64.rpm`
+          - **AppImage (Universal)**: `Homestead Tools-${{ env.APP_VERSION }}-x86_64.AppImage`
+          - **Debian/Ubuntu**: `Homestead Tools-${{ env.APP_VERSION }}-amd64.deb`
+          - **RedHat/Fedora**: `Homestead Tools-${{ env.APP_VERSION }}-x86_64.rpm`
           
           #### Linux Installation
           ```bash
