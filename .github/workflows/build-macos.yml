@@ -63,9 +63,9 @@ jobs:
           ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }}
           
           ### macOS Downloads (Unsigned)
-          - **Universal (Intel + Apple Silicon)**: Homestead Tools-${{ env.APP_VERSION }}-universal.dmg
-          - **Intel Macs**: Homestead Tools-${{ env.APP_VERSION }}-x64.dmg  
-          - **Apple Silicon**: Homestead Tools-${{ env.APP_VERSION }}-arm64.dmg
+          - **Universal (Intel + Apple Silicon)**: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-universal.dmg
+          - **Intel Macs**: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-x64.dmg  
+          - **Apple Silicon**: ${{ env.APP_NAME }}-${{ env.APP_VERSION }}-arm64.dmg
           
           ### Installation Instructions
           1. Download the appropriate DMG for your Mac
