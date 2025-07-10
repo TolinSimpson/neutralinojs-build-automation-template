@@ -87,12 +87,12 @@ jobs:
 
     - name: Verify Inno Setup script exists
       run: |
-        if (Test-Path "{{APP_BINARY_NAME}}.iss") {
-          echo "✓ Inno Setup script found: {{APP_BINARY_NAME}}.iss"
+        if (Test-Path "build automation/{{APP_BINARY_NAME}}.iss") {
+          echo "✓ Inno Setup script found: build automation/{{APP_BINARY_NAME}}.iss"
           echo "Script contents:"
-          Get-Content "{{APP_BINARY_NAME}}.iss" -Head 20
+          Get-Content "build automation/{{APP_BINARY_NAME}}.iss" -Head 20
         } else {
-          echo "❌ {{APP_BINARY_NAME}}.iss not found"
+          echo "❌ build automation/{{APP_BINARY_NAME}}.iss not found"
           Get-ChildItem "*.iss" -ErrorAction SilentlyContinue
           exit 1
         }
@@ -115,7 +115,7 @@ jobs:
         echo "Using Inno Setup at: $innoPath"
         
         # Compile the installer
-        & $innoPath "{{APP_BINARY_NAME}}.iss"
+        & $innoPath "build automation/{{APP_BINARY_NAME}}.iss"
         
         if ($LASTEXITCODE -eq 0) {
           echo "✅ Windows installer built successfully!"
