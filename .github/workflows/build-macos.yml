@@ -40,8 +40,8 @@ jobs:
 
     - name: Build macOS app bundles (unsigned but professional)
       run: |
-        chmod +x "build automation/build-mac-enhanced.sh"
-        "./build automation/build-mac-enhanced.sh" --dmg
+        chmod +x "build automation/build-mac.sh"
+        "./build automation/build-mac.sh" --dmg
 
     - name: Upload macOS builds
       uses: actions/upload-artifact@v4
