@@ -27,6 +27,7 @@ Before using this template, replace the following placeholders throughout the pr
 10. `.github/workflows/build-macos.yml` - macos GitHub action script
 11. `.github/workflows/build-windows.yml` - windows GitHub action script
 12. `.github/workflows/release-all-platforms.yml` - all platforms GitHub action script
+13. `build automation/build-linux.sh` - linux build script
 
 **Additional placeholders for build automation:**
 - `{{APP_DESCRIPTION}}` - App description for package metadata
