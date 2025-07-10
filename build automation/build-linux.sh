@@ -2,7 +2,7 @@
 #
 # build-linux.sh
 #
-# Linux build script for NeutralinoJS with AppImage, DEB, and RPM packaging
+# Enhanced Linux build script for NeutralinoJS with AppImage, DEB, and RPM packaging
 #
 # Requirements:
 # - jq
@@ -11,9 +11,9 @@
 # - rpmbuild (for .rpm packages)
 #
 # Usage:
-# ./build-linux.sh [--appimage] [--deb] [--rpm] [--all]
+# ./build-linux-enhanced.sh [--appimage] [--deb] [--rpm] [--all]
 #
-# Template Linux build script for {{APP_DISPLAY_NAME}}
+# (c)2025 Tolin Simpson - enhanced build automation.
 
 VERSION='1.1.0'
 OS=$(uname -s)
@@ -61,7 +61,7 @@ if [ "$CREATE_APPIMAGE" = false ] && [ "$CREATE_DEB" = false ] && [ "$CREATE_RPM
 fi
 
 echo
-echo -e "\033[1mNeutralinoJS BuildScript for Linux platform, version ${VERSION}\033[0m"
+echo -e "\033[1mEnhanced Neutralino BuildScript for Linux platform, version ${VERSION}\033[0m"
 
 CONF=./neutralino.config.json
 
@@ -83,6 +83,8 @@ APP_BINARY=$(jq -r '.cli.binaryName' ${CONF})
 APP_NAME=$(jq -r '.buildScript.linux.appName' ${CONF})
 APP_ICON=$(jq -r '.buildScript.linux.appIcon' ${CONF})
 APP_PATH=$(jq -r '.buildScript.linux.appPath' ${CONF})
+APP_PUBLISHER=$(jq -r '.buildScript.linux.appPublisher // "Publisher Name"' ${CONF})
+APP_DESCRIPTION=$(jq -r '.buildScript.linux.appDescription // "Your application Description Goes here."' ${CONF})
 
 if [ "$TEST_MODE" != true ]; then
     echo
@@ -107,7 +109,7 @@ create_desktop_file() {
 [Desktop Entry]
 Type=Application
 Name=${app_name}
-Comment=Comprehensive collection of calculators and tools for homestead management
+Comment=${APP_DESCRIPTION}
 Exec=${app_name}
 Icon=${app_name}
 Categories=Utility;Calculator;
@@ -165,10 +167,10 @@ create_appimage() {
     cp "${APP_DIR}/${APP_NAME}.desktop" "${APP_DIR}/usr/share/applications/"
     
     # Create AppRun script
-    cat > "${APP_DIR}/AppRun" << 'EOF'
+    cat > "${APP_DIR}/AppRun" << EOF
 #!/bin/bash
-HERE="$(dirname "$(readlink -f "${0}")")"
-exec "${HERE}/usr/bin/Homestead Tools" --path="${HERE}/usr/bin" --enable-extensions=true "$@"
+HERE="\$(dirname "\$(readlink -f "\${0}")")"
+exec "\${HERE}/usr/bin/${APP_NAME}" --path="\${HERE}/usr/bin" --enable-extensions=true "\$@"
 EOF
     chmod +x "${APP_DIR}/AppRun"
     
@@ -250,11 +252,8 @@ EOF
 Package: $(echo "${APP_NAME}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 Version: ${APP_VERSION}
 Architecture: ${deb_arch}
-Maintainer: Tolin Simpson
-Description: Homestead Tools - Calculators and tools for homestead management
- A comprehensive collection of calculators and tools for homestead management
- including compost calculators, solar energy planners, garden layout tools,
- and much more.
+Maintainer: ${APP_PUBLISHER}
+Description: ${APP_NAME} - ${APP_DESCRIPTION}
 Section: utils
 Priority: optional
 Depends: libc6
@@ -332,15 +331,13 @@ EOF
 Name: $(echo "${APP_NAME}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 Version: ${APP_VERSION}
 Release: 1%{?dist}
-Summary: Homestead Tools - Calculators and tools for homestead management
+Summary: ${APP_NAME} - ${APP_DESCRIPTION}
 License: MIT
-URL: https://github.com/{{GITHUB_USERNAME}}/{{GITHUB_REPO}}
+URL: https://github.com/${APP_PUBLISHER}/${APP_BINARY}
 BuildArch: ${rpm_arch}
 
 %description
-A comprehensive collection of calculators and tools for homestead management
-including compost calculators, solar energy planners, garden layout tools,
-and much more.
+${APP_DESCRIPTION}
 
 %files
 /usr/bin/${APP_NAME}
