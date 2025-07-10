@@ -1,0 +1,197 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: "{{APP_DISPLAY_NAME}}"
+  APP_VERSION: "{{APP_VERSION}}"
+  PUBLISHER: "{{APP_PUBLISHER}}"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install Neutralino CLI
+      run: npm install -g @neutralinojs/neu
+
+    - name: Build Neutralino app
+      run: |
+        echo "Building Neutralino application..."
+        neu build
+        echo "Neutralino build completed"
+
+    - name: Verify build files
+      run: |
+        echo "Checking for required files..."
+        if (Test-Path "dist/{{APP_BINARY_NAME}}/{{APP_BINARY_NAME}}-win_x64.exe") {
+          echo "✓ Windows executable found"
+          Get-ChildItem "dist/{{APP_BINARY_NAME}}/" -Name
+        } else {
+          echo "❌ Windows executable not found"
+          Get-ChildItem "dist/" -Recurse -Name
+          exit 1
+        }
+
+    - name: Run Windows build script (if exists)
+      run: |
+        if (Test-Path "./build-win.ps1") {
+          echo "Running PowerShell build script..."
+          ./build-win.ps1
+        } elseif (Test-Path "./build-win.sh") {
+          echo "Running Bash build script..."
+          bash ./build-win.sh
+        } else {
+          echo "No Windows build script found, proceeding with Inno Setup..."
+        }
+
+    - name: Setup Inno Setup with retry
+      run: |
+        echo "Installing Inno Setup via Chocolatey..."
+        choco install innosetup -y
+        Start-Sleep -Seconds 10
+        
+        # Verify installation and retry if needed
+        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") -and -not (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe")) {
+          echo "Inno Setup not found, retrying installation..."
+          choco install innosetup -y --force
+          Start-Sleep -Seconds 5
+        }
+        
+        # Final verification
+        if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+          echo "✓ Inno Setup 6 installed successfully"
+        } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe") {
+          echo "✓ Inno Setup 5 found"
+        } else {
+          echo "❌ Inno Setup installation failed"
+          exit 1
+        }
+
+    - name: Verify Inno Setup script exists
+      run: |
+        if (Test-Path "{{APP_BINARY_NAME}}.iss") {
+          echo "✓ Inno Setup script found: {{APP_BINARY_NAME}}.iss"
+          echo "Script contents:"
+          Get-Content "{{APP_BINARY_NAME}}.iss" -Head 20
+        } else {
+          echo "❌ {{APP_BINARY_NAME}}.iss not found"
+          Get-ChildItem "*.iss" -ErrorAction SilentlyContinue
+          exit 1
+        }
+
+    - name: Build Windows installer with Inno Setup
+      run: |
+        echo "Compiling Windows installer..."
+        
+        # Try Inno Setup 6 first, then 5
+        $innoPath = ""
+        if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+          $innoPath = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+        } elseif (Test-Path "C:\Program Files (x86)\Inno Setup 5\ISCC.exe") {
+          $innoPath = "C:\Program Files (x86)\Inno Setup 5\ISCC.exe"
+        } else {
+          echo "❌ Inno Setup compiler not found"
+          exit 1
+        }
+        
+        echo "Using Inno Setup at: $innoPath"
+        
+        # Compile the installer
+        & $innoPath "{{APP_BINARY_NAME}}.iss"
+        
+        if ($LASTEXITCODE -eq 0) {
+          echo "✅ Windows installer built successfully!"
+        } else {
+          echo "❌ Installer build failed with exit code: $LASTEXITCODE"
+          exit 1
+        }
+
+    - name: Verify installer output
+      run: |
+        echo "Checking for installer output..."
+        if (Test-Path "Output") {
+          echo "✓ Output directory found"
+          Get-ChildItem "Output" -Name
+          
+          $installerFiles = Get-ChildItem "Output\*.exe"
+          if ($installerFiles.Count -gt 0) {
+            foreach ($file in $installerFiles) {
+              $size = [math]::Round($file.Length / 1MB, 2)
+              echo "✓ Installer: $($file.Name) (${size} MB)"
+            }
+          } else {
+            echo "❌ No .exe files found in Output directory"
+            exit 1
+          }
+        } else {
+          echo "❌ Output directory not found"
+          exit 1
+        }
+
+    - name: Upload Windows installer
+      uses: actions/upload-artifact@v4
+      with:
+        name: homestead-tools-windows-installer-${{ github.run_number }}
+        path: |
+          Output/*.exe
+        retention-days: 90
+
+    - name: Create Release (on tags)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Output/*.exe
+        name: ${{ env.APP_NAME }} ${{ env.APP_VERSION }}
+        body: |
+          ## ${{ env.APP_NAME }} v${{ env.APP_VERSION }} - Windows Release
+          
+          ### 🪟 Windows Download
+          - **Installer**: `{{APP_BINARY_NAME}}-Windows64_Installer.exe`
+          
+          ### Installation Instructions
+          1. Download the installer
+          2. Right-click the installer → "Run as administrator" (recommended)
+          3. Follow the installation wizard
+          4. Launch from Start Menu or Desktop shortcut
+          
+          ### System Requirements
+          - Windows 10 or Windows 11 (64-bit)
+          - 50MB free disk space
+          - Administrator rights for installation (recommended)
+          
+          ### Security Note
+          This installer is unsigned. Windows may show a security warning:
+          1. Click "More info" on the Windows Defender SmartScreen dialog
+          2. Click "Run anyway"
+          3. This is normal for unsigned applications
+          
+          ### Features in v${{ env.APP_VERSION }}
+          - Professional Windows installer created with Inno Setup
+          - Automatic Start Menu integration
+          - Optional desktop shortcut
+          - Clean uninstall support
+          - Windows 10/11 compatibility
+          
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
