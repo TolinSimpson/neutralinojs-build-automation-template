@@ -10,12 +10,12 @@ OutputBaseFilename={{APP_BINARY_NAME}}-Windows64_Installer
 Compression=lzma
 SolidCompression=yes
 DisableDirPage=no
-SetupIconFile=..\resources\icons\favicon.ico
+SetupIconFile=resources\icons\favicon.ico
 
 [Files]
-Source: "..\dist\{{APP_BINARY_NAME}}\{{APP_BINARY_NAME}}-win_x64.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\dist\{{APP_BINARY_NAME}}\resources.neu"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\resources\icons\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\{{APP_BINARY_NAME}}\{{APP_BINARY_NAME}}-win_x64.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\{{APP_BINARY_NAME}}\resources.neu"; DestDir: "{app}"; Flags: ignoreversion
+Source: "resources\icons\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{{APP_DISPLAY_NAME}}"; Filename: "{app}\{{APP_BINARY_NAME}}-win_x64.exe"; IconFilename: "{app}\favicon.ico"
