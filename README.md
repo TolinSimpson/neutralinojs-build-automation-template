@@ -2,6 +2,11 @@
 
 This is a template for creating cross-platform desktop applications using [Neutralino.js](https://neutralino.js.org/) with comprehensive build automation and packaging tools.
 
+## Getting Started 
+1. Clone this repo
+2. Download the latest workflows.zip folder from releases
+3. Extract workflows.zip into your project's .github folder
+
 ## Template Placeholders
 
 Before using this template, replace the following placeholders throughout the project files:
@@ -23,6 +28,10 @@ Before using this template, replace the following placeholders throughout the pr
 6. `_app_scaffolds/` - Platform-specific packaging files
 7. `build automation/build-*.sh` - Build scripts
 8. `build automation/setup-macos-signing.sh` - macOS signing script
+9. `.github/workflows/build-linux.yml` - linux GitHub action script
+10. `.github/workflows/build-macos.yml` - macos GitHub action script
+11. `.github/workflows/build-windows.yml` - windows GitHub action script
+12. `.github/workflows/release-all-platforms.yml` - all platforms GitHub action script
 
 **Additional placeholders for build automation:**
 - `{{APP_DESCRIPTION}}` - App description for package metadata
