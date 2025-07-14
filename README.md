@@ -80,7 +80,7 @@ This template includes comprehensive build automation for all platforms using **
 ### Windows
 - Uses `template.iss` for Inno Setup installer
 - Builds x64 executable
-- Creates installer executable
+- Creates installer executable in the Output folder
 
 ### macOS
 - Creates .app bundle
