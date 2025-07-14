@@ -59,30 +59,67 @@ jobs:
       run: |
         # Verify required files exist
         $requiredFiles = @(
-          "dist/${{ env.APP_BINARY_NAME }}/${{ env.APP_BINARY_NAME }}-win_x64.exe",
-          "dist/${{ env.APP_BINARY_NAME }}/resources.neu",
+          "dist/$env:APP_BINARY_NAME/$env:APP_BINARY_NAME-win_x64.exe",
+          "dist/$env:APP_BINARY_NAME/resources.neu",
           "resources/icons/favicon.ico",
-          "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+          "$env:BUILD_AUTOMATION_PATH/$env:INSTALLER_SCRIPT"
         )
         
         foreach ($file in $requiredFiles) {
           if (-not (Test-Path $file)) {
+            echo "❌ Required file not found: $file"
+            echo "📁 Checking what files exist in dist directory:"
+            if (Test-Path "dist") {
+              Get-ChildItem -Recurse "dist" | ForEach-Object { echo "  $($_.FullName)" }
+            } else {
+              echo "  dist directory doesn't exist"
+            }
             throw "Required file not found: $file"
           }
         }
         echo "✅ All required files verified"
         
+        # Ensure Output directory exists
+        if (-not (Test-Path "Output")) {
+          New-Item -ItemType Directory -Name "Output" -Force
+          echo "📁 Created Output directory"
+        }
+        
         # Compile installer
         echo "Compiling Windows installer..."
-        & $env:INNO_PATH "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+        echo "📋 Using Inno Setup at: $env:INNO_PATH"
+        echo "📋 Compiling script: $env:BUILD_AUTOMATION_PATH/$env:INSTALLER_SCRIPT"
+        
+        & $env:INNO_PATH "$env:BUILD_AUTOMATION_PATH/$env:INSTALLER_SCRIPT"
         
         if ($LASTEXITCODE -ne 0) {
+          echo "❌ Inno Setup compilation failed with exit code: $LASTEXITCODE"
+          echo "📁 Checking if Output directory exists after compilation:"
+          if (Test-Path "Output") {
+            echo "  Output directory exists, contents:"
+            Get-ChildItem "Output" | ForEach-Object { echo "    $($_.Name)" }
+          } else {
+            echo "  Output directory doesn't exist"
+          }
           throw "Inno Setup compilation failed with exit code: $LASTEXITCODE"
         }
         
-        # Verify installer output (Inno Setup creates installer in root directory)
-        $installerFile = "${{ env.INSTALLER_EXE }}"
+        # Verify installer output (Inno Setup creates installer in Output directory)
+        $installerFile = "Output/$env:INSTALLER_EXE"
+        echo "🔍 Looking for installer at: $installerFile"
+        
         if (-not (Test-Path $installerFile)) {
+          echo "❌ Installer file not found: $installerFile"
+          echo "📁 Contents of Output directory:"
+          if (Test-Path "Output") {
+            Get-ChildItem "Output" | ForEach-Object { echo "    $($_.Name) ($($_.Length) bytes)" }
+          } else {
+            echo "    Output directory doesn't exist"
+          }
+          echo "📁 Contents of build automation directory:"
+          if (Test-Path "$env:BUILD_AUTOMATION_PATH") {
+            Get-ChildItem "$env:BUILD_AUTOMATION_PATH" | ForEach-Object { echo "    $($_.Name)" }
+          }
           throw "Installer file not found: $installerFile"
         }
         

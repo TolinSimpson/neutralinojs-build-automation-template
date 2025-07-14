@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v1.0.1)'
+        description: 'Version to release (e.g., v1.0.0)'
         required: true
-        default: 'v1.0.1'
+        default: 'v1.0.0'
 
 permissions:
   contents: write
@@ -87,10 +87,10 @@ jobs:
     - name: Build Windows installer
       run: |
         # Compile Inno Setup script
-        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "${{ env.BUILD_AUTOMATION_PATH }}/${{ env.INSTALLER_SCRIPT }}"
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "$env:BUILD_AUTOMATION_PATH/$env:INSTALLER_SCRIPT"
         
         # Verify installer was created
-        $installerFile = "${{ env.INSTALLER_EXE }}"
+        $installerFile = "Output/$env:INSTALLER_EXE"
         if (-not (Test-Path $installerFile)) {
           throw "Installer file not found: $installerFile"
         }
@@ -102,7 +102,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: windows-installer
-        path: ${{ env.INSTALLER_EXE }}
+        path: Output/${{ env.INSTALLER_EXE }}
         retention-days: 7
 
   build-macos:
@@ -267,28 +267,28 @@ jobs:
           - **Requirements**: Windows 10/11 (64-bit)
           
           ### 🍎 macOS
-          - **Universal (Recommended)**: `Homestead Tools-${{ env.APP_VERSION }}-universal.dmg`
-          - **Intel Macs**: `Homestead Tools-${{ env.APP_VERSION }}-x64.dmg`  
-          - **Apple Silicon**: `Homestead Tools-${{ env.APP_VERSION }}-arm64.dmg`
+          - **Universal (Recommended)**: `My App-${{ env.APP_VERSION }}-universal.dmg`
+          - **Intel Macs**: `My App-${{ env.APP_VERSION }}-x64.dmg`  
+          - **Apple Silicon**: `My App-${{ env.APP_VERSION }}-arm64.dmg`
           - **Installation**: Download DMG → Double-click → Drag to Applications
           - **First Launch**: Right-click app → "Open" → "Open" (one-time for unsigned)
           
           ### 🐧 Linux
-          - **AppImage (Universal)**: `Homestead Tools-${{ env.APP_VERSION }}-x86_64.AppImage`
-          - **Debian/Ubuntu**: `Homestead Tools-${{ env.APP_VERSION }}-amd64.deb`
-          - **RedHat/Fedora**: `Homestead Tools-${{ env.APP_VERSION }}-x86_64.rpm`
+          - **AppImage (Universal)**: `My App-${{ env.APP_VERSION }}-x86_64.AppImage`
+          - **Debian/Ubuntu**: `My App-${{ env.APP_VERSION }}-amd64.deb`
+          - **RedHat/Fedora**: `My App-${{ env.APP_VERSION }}-x86_64.rpm`
           
           #### Linux Installation
           ```bash
           # AppImage (works on all distributions)
-          chmod +x Homestead\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
-          ./Homestead\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
+          chmod +x MyApp\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
+          ./MyApp\ Tools-${{ env.APP_VERSION }}-x86_64.AppImage
           
           # Debian/Ubuntu
-          sudo dpkg -i homestead-tools-${{ env.APP_VERSION }}-amd64.deb
+          sudo dpkg -i MyApp-tools-${{ env.APP_VERSION }}-amd64.deb
           
           # RedHat/Fedora
-          sudo rpm -i homestead-tools-${{ env.APP_VERSION }}-x86_64.rpm
+          sudo rpm -i MyApp-tools-${{ env.APP_VERSION }}-x86_64.rpm
           ```
           
           ### 🎯 What's New in v${{ env.APP_VERSION }}
