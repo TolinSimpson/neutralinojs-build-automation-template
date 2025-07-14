@@ -1,124 +1,94 @@
-// Main JavaScript file for {{APP_DISPLAY_NAME}}
+// My App - Main Application JavaScript
 
-// Initialize the app when Neutralino is ready
-Neutralino.init();
+let platformElement;
 
-// Event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
-    setupEventListeners();
+// Initialize Neutralino
+function onWindowReady() {
+    Neutralino.init();
+    
+    // Platform detection (but don't display it prominently)
+    detectPlatform();
+    
+    // Set up window controls
+    setupWindowControls();
+    
+    console.log('Application initialized successfully');
+}
+
+async function detectPlatform() {
+    try {
+        const osInfo = await Neutralino.os.getInfo();
+        console.log(`Platform: ${osInfo.name} ${osInfo.version}`);
+    } catch (error) {
+        console.log('Platform detection failed:', error);
+    }
+}
+
+function setupWindowControls() {
+    // Remove minimize and maximize buttons if they exist
+    try {
+        Neutralino.window.setTitle("Application - Application Description");
+    } catch (error) {
+        console.log('Window setup failed:', error);
+    }
+}
+
+// Neutralino event handlers
+Neutralino.events.on("windowClose", async () => {
+    // Only exit if the window is actually being closed, not minimized
+    try {
+        const isVisible = await Neutralino.window.isVisible();
+        const isMinimized = await Neutralino.window.isMinimized();
+        
+        // If window is hidden but not minimized, it might be a real close event
+        if (!isVisible && !isMinimized) {
+            Neutralino.app.exit();
+        }
+    } catch (error) {
+        // If we can't check window state, assume it's a real close
+        console.log('Window state check failed, exiting:', error);
+        Neutralino.app.exit();
+    }
 });
 
-// Handle app close events
-Neutralino.events.on("windowClose", function() {
-    Neutralino.app.exit();
+Neutralino.events.on("ready", onWindowReady);
+
+// Add window focus event handling to prevent disappearing issues
+async function handleWindowFocus() {
+    try {
+        // Ensure window is visible and focused
+        await Neutralino.window.show();
+        await Neutralino.window.focus();
+    } catch (error) {
+        console.log('Focus handling failed:', error);
+    }
+}
+
+// Handle window minimize/restore events more gracefully
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible') {
+        // Window became visible again (e.g., after alt-tab)
+        try {
+            await Neutralino.window.show();
+            await Neutralino.window.focus();
+        } catch (error) {
+            console.log('Visibility change handling failed:', error);
+        }
+    }
 });
 
-// Initialize the application
-async function initializeApp() {
-    try {
-        // Get platform information
-        const osInfo = await Neutralino.os.getEnv('OS');
-        const platformElement = document.getElementById('platform');
-        
-        if (platformElement) {
-            if (osInfo) {
-                platformElement.textContent = `Platform: ${osInfo}`;
-            } else {
-                // Fallback platform detection
-                const userAgent = navigator.userAgent;
-                let platform = 'Unknown';
-                
-                if (userAgent.includes('Windows')) platform = 'Windows';
-                else if (userAgent.includes('Mac')) platform = 'macOS';
-                else if (userAgent.includes('Linux')) platform = 'Linux';
-                
-                platformElement.textContent = `Platform: ${platform}`;
-            }
-        }
-        
-        showMessage('Application initialized successfully!', 'success');
-    } catch (error) {
-        console.error('Initialization error:', error);
-        showMessage('Failed to initialize application.', 'error');
-    }
-}
-
-// Set up event listeners for buttons
-function setupEventListeners() {
-    const helloButton = document.getElementById('btn-hello');
-    const quitButton = document.getElementById('btn-quit');
+// Quick utility functions for the app
+function showNotification(message, type = 'info') {
+    // Simple notification system
+    console.log(`${type.toUpperCase()}: ${message}`);
     
-    if (helloButton) {
-        helloButton.addEventListener('click', handleHelloClick);
-    }
-    
-    if (quitButton) {
-        quitButton.addEventListener('click', handleQuitClick);
+    // Could be enhanced with proper notifications later
+    if (typeof Neutralino !== 'undefined' && Neutralino.os && Neutralino.os.showNotification) {
+        Neutralino.os.showNotification('My App', message);
     }
 }
 
-// Handle hello button click
-async function handleHelloClick() {
-    try {
-        // You can add your custom functionality here
-        showMessage('Hello from {{APP_DISPLAY_NAME}}! 👋', 'success');
-        
-        // Example: Show system notification (if permissions allow)
-        if (Neutralino.os.showNotification) {
-            await Neutralino.os.showNotification(
-                '{{APP_DISPLAY_NAME}}',
-                'Hello from your Neutralino app!'
-            );
-        }
-    } catch (error) {
-        console.error('Hello action error:', error);
-        showMessage('Could not complete hello action.', 'error');
-    }
-}
-
-// Handle quit button click
-async function handleQuitClick() {
-    try {
-        const confirmQuit = confirm('Are you sure you want to quit {{APP_DISPLAY_NAME}}?');
-        if (confirmQuit) {
-            await Neutralino.app.exit();
-        }
-    } catch (error) {
-        console.error('Quit error:', error);
-        showMessage('Could not quit application.', 'error');
-    }
-}
-
-// Utility function to show messages
-function showMessage(message, type = 'info') {
-    const messageArea = document.getElementById('message-area');
-    if (messageArea) {
-        messageArea.textContent = message;
-        messageArea.className = `message-area ${type}`;
-        
-        // Clear message after 3 seconds for success messages
-        if (type === 'success') {
-            setTimeout(() => {
-                if (messageArea.textContent === message) {
-                    messageArea.textContent = '';
-                    messageArea.className = 'message-area';
-                }
-            }, 3000);
-        }
-    }
-}
-
-// Debug function for development
-function debugInfo() {
-    console.log('{{APP_DISPLAY_NAME}} Debug Info:');
-    console.log('Version: {{APP_VERSION}}');
-    console.log('Publisher: {{APP_PUBLISHER}}');
-    console.log('Neutralino version:', NL_VERSION);
-}
-
-// Export functions for external use if needed
-window.AppAPI = {
-    showMessage,
-    debugInfo
-}; 
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('My App DOM ready');
+}); 
