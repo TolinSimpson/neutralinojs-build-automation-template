@@ -34,7 +34,7 @@ jobs:
       with:
         node-version: '18'
 
-    - name: Install Neutralino CLI and build app (fixes uuid)
+    - name: Install Neutralino CLI and build app
       run: |
         npm install -g @neutralinojs/neu
         npm install -g uuid@8
