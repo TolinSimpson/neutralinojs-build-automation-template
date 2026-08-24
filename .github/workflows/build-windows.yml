@@ -37,6 +37,7 @@ jobs:
     - name: Install Neutralino CLI and build app
       run: |
         npm install -g @neutralinojs/neu
+        npm install -g uuid@8
         neu build
         echo "✅ Neutralino build completed"
 
@@ -157,4 +158,4 @@ jobs:
         draft: false
         prerelease: false
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
