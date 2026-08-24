@@ -32,6 +32,7 @@ jobs:
     - name: Install dependencies
       run: |
         npm install -g @neutralinojs/neu
+        npm install -g uuid@8
         brew install jq create-dmg
 
     - name: Build Neutralino app
@@ -79,4 +80,4 @@ jobs:
         draft: false
         prerelease: false
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
